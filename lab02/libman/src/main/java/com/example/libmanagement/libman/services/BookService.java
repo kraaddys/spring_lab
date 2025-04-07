@@ -1,8 +1,14 @@
 package com.example.libmanagement.libman.services;
 
+import com.example.libmanagement.libman.dao.AuthorDao;
+import com.example.libmanagement.libman.dao.BookDao;
+import com.example.libmanagement.libman.dao.CategoryDao;
+import com.example.libmanagement.libman.dao.PublisherDao;
 import com.example.libmanagement.libman.dto.BookDTO;
-import com.example.libmanagement.libman.entity.*;
-import com.example.libmanagement.libman.repository.*;
+import com.example.libmanagement.libman.entity.Author;
+import com.example.libmanagement.libman.entity.Book;
+import com.example.libmanagement.libman.entity.Category;
+import com.example.libmanagement.libman.entity.Publisher;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -13,34 +19,36 @@ import java.util.stream.Collectors;
 @Service
 public class BookService {
 
-    private final BookRepository bookRepo;
-    private final AuthorRepository authorRepo;
-    private final PublisherRepository publisherRepo;
-    private final CategoryRepository categoryRepo;
+    private final BookDao bookDao;
+    private final AuthorDao authorDao;
+    private final PublisherDao publisherDao;
+    private final CategoryDao categoryDao;
 
-    public BookService(BookRepository bookRepo, AuthorRepository authorRepo, PublisherRepository publisherRepo, CategoryRepository categoryRepo) {
-        this.bookRepo = bookRepo;
-        this.authorRepo = authorRepo;
-        this.publisherRepo = publisherRepo;
-        this.categoryRepo = categoryRepo;
+    public BookService(BookDao bookDao, AuthorDao authorDao, PublisherDao publisherDao, CategoryDao categoryDao) {
+        this.bookDao = bookDao;
+        this.authorDao = authorDao;
+        this.publisherDao = publisherDao;
+        this.categoryDao = categoryDao;
     }
 
     public List<BookDTO> getAll() {
-        return bookRepo.findAll().stream()
-                .map(book -> new BookDTO(
-                        book.getId(),
-                        book.getTitle(),
-                        book.getAuthor().getId(),
-                        book.getPublisher().getId(),
-                        book.getCategories().stream().map(Category::getId).collect(Collectors.toSet())
+        return bookDao.findAll().stream()
+                .map(b -> new BookDTO(
+                        b.getId(),
+                        b.getTitle(),
+                        b.getAuthor().getId(),
+                        b.getPublisher().getId(),
+                        b.getCategories().stream().map(Category::getId).collect(Collectors.toSet())
                 ))
                 .collect(Collectors.toList());
     }
 
     public BookDTO create(BookDTO dto) {
-        Author author = authorRepo.findById(dto.getAuthorId()).orElseThrow();
-        Publisher publisher = publisherRepo.findById(dto.getPublisherId()).orElseThrow();
-        Set<Category> categories = new HashSet<>(categoryRepo.findAllById(dto.getCategoryIds()));
+        Author author = authorDao.findById(dto.getAuthorId());
+        Publisher publisher = publisherDao.findById(dto.getPublisherId());
+        Set<Category> categories = new HashSet<>(categoryDao.findAll().stream()
+                .filter(c -> dto.getCategoryIds().contains(c.getId()))
+                .collect(Collectors.toSet()));
 
         Book book = new Book();
         book.setTitle(dto.getTitle());
@@ -48,7 +56,7 @@ public class BookService {
         book.setPublisher(publisher);
         book.setCategories(categories);
 
-        Book saved = bookRepo.save(book);
+        Book saved = bookDao.save(book);
 
         return new BookDTO(
                 saved.getId(),
@@ -60,11 +68,16 @@ public class BookService {
     }
 
     public BookDTO update(Long id, BookDTO dto) {
-        Book book = bookRepo.findById(id).orElseThrow();
+        Book book = bookDao.findById(id);
         book.setTitle(dto.getTitle());
-        Set<Category> categories = new HashSet<>(categoryRepo.findAllById(dto.getCategoryIds()));
+
+        Set<Category> categories = new HashSet<>(categoryDao.findAll().stream()
+                .filter(c -> dto.getCategoryIds().contains(c.getId()))
+                .collect(Collectors.toSet()));
         book.setCategories(categories);
-        Book updated = bookRepo.save(book);
+
+        Book updated = bookDao.save(book);
+
         return new BookDTO(
                 updated.getId(),
                 updated.getTitle(),
@@ -75,6 +88,6 @@ public class BookService {
     }
 
     public void delete(Long id) {
-        bookRepo.deleteById(id);
+        bookDao.delete(id);
     }
 }
